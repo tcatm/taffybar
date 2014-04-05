@@ -119,15 +119,8 @@ batteryBarNew height battCfg pollSeconds = do
           lbl = Just "No battery"
       labelNew lbl >>= return . toWidget
     Just ctxt -> do
-      -- This is currently pretty inefficient - each poll period it
-      -- queries the battery twice (once for the label and once for
-      -- the bar).
-      --
-      -- Converting it to combine the two shouldn't be hard.
       b <- hBoxNew False 1
-      txt <- textBatteryNew "$percentage$%" pollSeconds
       bar <- pollingBatteryBarNew height battCfg pollSeconds $ getBatteryInfo ctxt
       boxPackStart b bar PackNatural 0
-      boxPackStart b txt PackNatural 0
       widgetShowAll b
       return (toWidget b)
