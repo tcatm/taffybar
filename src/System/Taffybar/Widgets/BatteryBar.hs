@@ -33,6 +33,7 @@ data BarConfig =
             , barColor :: Double -> (Double, Double, Double) -- ^ A function to determine the color of the widget for the current data point
             , barFlashColor :: (Double, Double, Double) -- ^ Color of the charging indicator
             , barAlertColor :: (Double, Double, Double) -- ^ Color of the alert (empty) indicator
+            , barPlugColor :: (Double, Double, Double) -- ^ Color of the plug (fully charged) indicator
             , barPadding :: Int -- ^ Number of pixels of padding around the widget
             }
 
@@ -43,6 +44,7 @@ defaultBarConfig c = BarConfig { barBorderColor = (0.4, 0.4, 0.4)
                                , barBackgroundColor = const (0, 0, 0)
                                , barFlashColor = (0.15, 0.15, 0.15)
                                , barAlertColor = (1, 0, 0)
+                               , barPlugColor = (0.15, 0.15, 0.15)
                                , barColor = c
                                , barPadding = 3
                                }
@@ -106,6 +108,29 @@ renderFlash cfg = do
   fill
   restore
 
+renderPlug cfg = do
+  let (frameR, frameG, frameB) = barPlugColor cfg
+  setSourceRGB frameR frameG frameB
+  save
+  scale (1/16) (1/16)
+  moveTo 4 6
+  lineTo 4 8.1875
+  curveTo 2.8416522 8.6030105 2 9.6986791 2 11
+  lineTo 3 11
+  lineTo 3 13
+  lineTo 4 13
+  lineTo 4 11
+  lineTo 6 11
+  lineTo 6 13
+  lineTo 7 13
+  lineTo 7 11
+  lineTo 8 11
+  curveTo 8 9.6986791 7.1583478 8.6030105 6 8.1875
+  lineTo 6 6
+  lineTo 4 6
+  fill
+  restore
+
 renderAlert cfg = do
   let (frameR, frameG, frameB) = barAlertColor cfg
   setSourceRGB frameR frameG frameB
@@ -140,6 +165,9 @@ renderBar info cfg width height = do
 
   let empty = batteryState info == BatteryStateEmpty
   when empty $ renderAlert cfg
+
+  let full = batteryState info == BatteryStateFullyCharged
+  when full $ renderPlug cfg
 
 drawBar :: MVar BatteryBarState -> DrawingArea -> IO ()
 drawBar mv drawArea = do
