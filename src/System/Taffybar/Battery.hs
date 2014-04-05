@@ -22,7 +22,7 @@ import Text.Printf ( printf )
 import Text.StringTemplate
 
 import System.Information.Battery
-import System.Taffybar.Widgets.PollingBar
+import System.Taffybar.Widgets.PollingBatteryBar
 import System.Taffybar.Widgets.PollingLabel
 
 safeGetBatteryInfo :: IORef BatteryContext -> IO (Maybe BatteryInfo)
@@ -94,27 +94,24 @@ battPct r = do
     Nothing -> return 0
     Just info -> return (batteryPercentage info / 100)
 
--- | A default configuration for the graphical battery display.  The
--- bar will be red when power is critical (< 10%), green if it is full
--- (> 90%), and grey otherwise.
---
--- You can customize this with any of the options in 'BarConfig'
 defaultBatteryConfig :: BarConfig
 defaultBatteryConfig =
   defaultBarConfig colorFunc
   where
     colorFunc pct
       | pct < 0.1 = (1, 0, 0)
-      | pct < 0.9 = (0.5, 0.5, 0.5)
+      | pct < 0.9 = (1, 1, 1)
       | otherwise = (0, 1, 0)
+
 
 -- | A fancy graphical battery widget that represents the current
 -- charge as a colored vertical bar.  There is also a textual
 -- percentage readout next to the bar.
-batteryBarNew :: BarConfig -- ^ Configuration options for the bar display
+batteryBarNew :: Int -- ^ Height of bar
+                 -> BarConfig -- ^ Configuration options for the bar display
                  -> Double -- ^ Polling period in seconds
                  -> IO Widget
-batteryBarNew battCfg pollSeconds = do
+batteryBarNew height battCfg pollSeconds = do
   battCtxt <- batteryContextNew
   case battCtxt of
     Nothing -> do
@@ -129,8 +126,7 @@ batteryBarNew battCfg pollSeconds = do
       -- Converting it to combine the two shouldn't be hard.
       b <- hBoxNew False 1
       txt <- textBatteryNew "$percentage$%" pollSeconds
-      r <- newIORef ctxt
-      bar <- pollingBarNew battCfg pollSeconds (battPct r)
+      bar <- pollingBatteryBarNew height battCfg pollSeconds $ getBatteryInfo ctxt
       boxPackStart b bar PackNatural 0
       boxPackStart b txt PackNatural 0
       widgetShowAll b
