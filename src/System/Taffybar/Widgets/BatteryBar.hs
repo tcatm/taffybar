@@ -13,6 +13,7 @@ module System.Taffybar.Widgets.BatteryBar (
 
 import Data.Maybe
 import Control.Concurrent
+import Control.Monad
 import Graphics.Rendering.Cairo
 import Graphics.UI.Gtk
 
@@ -31,6 +32,7 @@ data BarConfig =
             , barBackgroundColor :: Double -> (Double, Double, Double) -- ^ The background color of the widget
             , barColor :: Double -> (Double, Double, Double) -- ^ A function to determine the color of the widget for the current data point
             , barFlashColor :: (Double, Double, Double) -- ^ Color of the charging indicator
+            , barAlertColor :: (Double, Double, Double) -- ^ Color of the alert (empty) indicator
             , barPadding :: Int -- ^ Number of pixels of padding around the widget
             }
 
@@ -40,6 +42,7 @@ defaultBarConfig :: (Double -> (Double, Double, Double)) -> BarConfig
 defaultBarConfig c = BarConfig { barBorderColor = (0.4, 0.4, 0.4)
                                , barBackgroundColor = const (0, 0, 0)
                                , barFlashColor = (0.15, 0.15, 0.15)
+                               , barAlertColor = (1, 0, 0)
                                , barColor = c
                                , barPadding = 3
                                }
@@ -103,11 +106,27 @@ renderFlash cfg = do
   fill
   restore
 
+renderAlert cfg = do
+  let (frameR, frameG, frameB) = barAlertColor cfg
+  setSourceRGB frameR frameG frameB
+  save
+  scale (1/16) (1/16)
+  moveTo 4 4
+  lineTo 4 10
+  lineTo 6 10
+  lineTo 6 4
+  fill
+  moveTo 4 12
+  lineTo 4 14
+  lineTo 6 14
+  lineTo 6 12
+  fill
+  restore
+
 renderBar :: BatteryInfo -> BarConfig -> Int -> Int -> Render ()
 renderBar info cfg width height = do
   let pad = barPadding cfg
   let pct = clamp 0 1 $ ((batteryPercentage info) / 100)
-  let charging = batteryState info == BatteryStateCharging
 
   translate (fromIntegral pad) (fromIntegral pad)
   let s = fromIntegral (height - 2 * pad)
@@ -116,9 +135,11 @@ renderBar info cfg width height = do
   renderBackground cfg
   renderForeground cfg pct
 
-  case charging of
-    False -> return()
-    True -> renderFlash cfg
+  let charging = batteryState info == BatteryStateCharging
+  when charging $ renderFlash cfg
+
+  let empty = batteryState info == BatteryStateEmpty
+  when empty $ renderAlert cfg
 
 drawBar :: MVar BatteryBarState -> DrawingArea -> IO ()
 drawBar mv drawArea = do
