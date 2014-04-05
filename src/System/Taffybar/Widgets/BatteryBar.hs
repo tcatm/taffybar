@@ -59,15 +59,15 @@ clamp lo hi d = max lo $ min hi d
 renderCell :: Render ()
 renderCell = do
   save
-  scale (1/46) (1/46)
-  moveTo 0 46
-  lineTo 30 46
-  lineTo 30 5
-  lineTo 22 5
-  lineTo 22 0
-  lineTo 8 0
-  lineTo 8 5
-  lineTo 0 5
+  scale (1/16) (1/16)
+  moveTo 0 16
+  lineTo 10 16
+  lineTo 10 2
+  lineTo 7 2
+  lineTo 7 0
+  lineTo 3 0
+  lineTo 3 2
+  lineTo 0 2
   closePath
   restore
 
@@ -91,14 +91,15 @@ renderFlash cfg = do
   let (frameR, frameG, frameB) = barFlashColor cfg
   setSourceRGB frameR frameG frameB
   save
-  scale (1/46) (1/46)
-  moveTo 8 11
-  lineTo 6 25
-  lineTo 12 25
-  lineTo 6 41
-  lineTo 24 23
-  lineTo 14 23
-  lineTo 22 11
+  scale (1/16) (1/16)
+  translate (1/3) 0
+  moveTo 3 4
+  lineTo 2 9
+  lineTo 4 9
+  lineTo 2 14
+  lineTo 8 8
+  lineTo 5 8
+  lineTo 7 4
   fill
   restore
 
