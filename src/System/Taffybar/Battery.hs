@@ -13,16 +13,21 @@ module System.Taffybar.Battery (
   defaultBatteryConfig
   ) where
 
+import Control.Monad
+import Control.Monad.STM
+import Control.Concurrent.STM.TVar
 import qualified Control.Exception.Enclosed as E
 import Data.Int ( Int64 )
 import Data.IORef
+import Data.Map
 import Graphics.UI.Gtk
 import qualified System.IO as IO
 import Text.Printf ( printf )
 import Text.StringTemplate
 
 import System.Information.Battery
-import System.Taffybar.Widgets.PollingBatteryBar
+import System.Information.UPower
+import System.Taffybar.Widgets.BatteryBar
 import System.Taffybar.Widgets.PollingLabel
 
 safeGetBatteryInfo :: IORef BatteryContext -> IO (Maybe BatteryInfo)
@@ -103,24 +108,47 @@ defaultBatteryConfig =
       | pct < 0.9 = (1, 1, 1)
       | otherwise = (0, 1, 0)
 
+frontend s battCfg height = UPowerFrontend { upowerAdd = batteryAdd s battCfg height
+                                           , upowerRemove = batteryRemove s
+                                           , upowerUpdate = batteryUpdate s
+                                           }
 
--- | A fancy graphical battery widget that represents the current
--- charge as a colored vertical bar.  There is also a textual
--- percentage readout next to the bar.
+batteryAdd s battCfg height path object = do
+  let widgets = snd s
+  a <- readTVarIO widgets
+  when (notMember path a) $ do
+    (bar, handle) <- batteryWidgetNew height battCfg
+    batteryWidgetSet handle object
+    boxPackStart (fst s) bar PackNatural 0
+    let a' = insert path (bar, handle) a
+    atomically . writeTVar widgets $ a'
+
+batteryRemove s path = do
+  let widgets = snd s
+  a <- readTVarIO widgets
+  let widget = Data.Map.lookup path a
+  case widget of
+    Nothing -> return ()
+    Just (b, _) -> do
+      containerRemove (fst s) b
+      let a' = delete path a
+      atomically . writeTVar widgets $ a'
+
+batteryUpdate s path object = do
+  let widgets = snd s
+  a <- readTVarIO widgets
+  let widget = Data.Map.lookup path a
+  case widget of
+    Nothing -> return ()
+    Just (_,b) -> batteryWidgetSet b object
+  
+
 batteryBarNew :: Int -- ^ Height of bar
                  -> BarConfig -- ^ Configuration options for the bar display
-                 -> Double -- ^ Polling period in seconds
                  -> IO Widget
-batteryBarNew height battCfg pollSeconds = do
-  battCtxt <- batteryContextNew
-  case battCtxt of
-    Nothing -> do
-      let lbl :: Maybe String
-          lbl = Just "No battery"
-      labelNew lbl >>= return . toWidget
-    Just ctxt -> do
-      b <- hBoxNew False 1
-      bar <- pollingBatteryBarNew height battCfg pollSeconds $ getBatteryInfo ctxt
-      boxPackStart b bar PackNatural 0
-      widgetShowAll b
-      return (toWidget b)
+batteryBarNew height battCfg = do
+  widgets <- newTVarIO (empty :: Map UPowerId (Widget, BatteryBarHandle))
+  b <- hBoxNew False 1
+  upowerWatcher $ frontend (b, widgets) battCfg height
+  widgetShowAll b
+  return (toWidget b)

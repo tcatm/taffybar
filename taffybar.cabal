@@ -83,7 +83,6 @@ library
                    System.Taffybar.Widgets.BatteryBar,
                    System.Taffybar.Widgets.Graph,
                    System.Taffybar.Widgets.PollingBar,
-                   System.Taffybar.Widgets.PollingBatteryBar,
                    System.Taffybar.Widgets.PollingGraph,
                    System.Taffybar.Widgets.PollingLabel,
                    System.Taffybar.Widgets.Util,
@@ -96,7 +95,8 @@ library
                    System.Information.Network,
                    System.Information.CPU,
                    System.Information.CPU2,
-                   System.Information.DiskIO
+                   System.Information.DiskIO,
+                   System.Information.UPower
   other-modules: System.Taffybar.StrutProperties,
                  Paths_taffybar
 

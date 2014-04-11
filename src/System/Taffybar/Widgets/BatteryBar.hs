@@ -5,8 +5,8 @@ module System.Taffybar.Widgets.BatteryBar (
   BatteryBarHandle,
   BarConfig(..),
   -- * Accessors/Constructors
-  batteryBarNew,
-  batteryBarSet,
+  batteryWidgetNew,
+  batteryWidgetSet,
   defaultBarConfig
   ) where
 
@@ -17,15 +17,14 @@ import Control.Monad
 import Graphics.Rendering.Cairo
 import Graphics.UI.Gtk
 
-import System.Information.Battery
+import System.Information.UPower
 
 newtype BatteryBarHandle = BBH (MVar BatteryBarState)
 data BatteryBarState =
-  BatteryBarState { barIsBootstrapped :: Bool
-                   , barInfo :: Maybe BatteryInfo
-                   , barCanvas :: DrawingArea
-                   , barConfig :: BarConfig
-                   }
+  BatteryBarState { barInfo :: Maybe UPowerInfo
+                  , barCanvas :: DrawingArea
+                  , barConfig :: BarConfig
+                  }
 
 data BarConfig =
   BarConfig { barBorderColor :: (Double, Double, Double) -- ^ Color of the border drawn around the widget
@@ -49,14 +48,12 @@ defaultBarConfig c = BarConfig { barBorderColor = (0.4, 0.4, 0.4)
                                , barPadding = 3
                                }
 
-batteryBarSet :: BatteryBarHandle -> BatteryInfo -> IO ()
-batteryBarSet (BBH mv) info = do
+batteryWidgetSet :: BatteryBarHandle -> UPowerInfo -> IO ()
+batteryWidgetSet (BBH mv) info = do
   s <- readMVar mv
   let drawArea = barCanvas s
   modifyMVar_ mv (\s' -> return s' { barInfo = Just info })
-  case barIsBootstrapped s of
-    False -> return ()
-    True -> postGUIAsync $ widgetQueueDraw drawArea
+  postGUIAsync $ widgetQueueDraw drawArea
 
 clamp :: Double -> Double -> Double -> Double
 clamp lo hi d = max lo $ min hi d
@@ -148,10 +145,10 @@ renderAlert cfg = do
   fill
   restore
 
-renderBar :: BatteryInfo -> BarConfig -> Int -> Int -> Render ()
+renderBar :: UPowerInfo -> BarConfig -> Int -> Int -> Render ()
 renderBar info cfg width height = do
   let pad = barPadding cfg
-  let pct = clamp 0 1 $ ((batteryPercentage info) / 100)
+  let pct = clamp 0 1 $ ((upowerPercentage info) / 100)
 
   translate (fromIntegral pad) (fromIntegral pad)
   let s = fromIntegral (height - 2 * pad)
@@ -160,13 +157,13 @@ renderBar info cfg width height = do
   renderBackground cfg
   renderForeground cfg pct
 
-  let charging = batteryState info == BatteryStateCharging
+  let charging = upowerState info == UPowerStateCharging
   when charging $ renderFlash cfg
 
-  let empty = batteryState info == BatteryStateEmpty
+  let empty = upowerState info == UPowerStateEmpty
   when empty $ renderAlert cfg
 
-  let full = batteryState info == BatteryStateFullyCharged
+  let full = upowerState info == UPowerStateFullyCharged
   when full $ renderPlug cfg
 
 drawBar :: MVar BatteryBarState -> DrawingArea -> IO ()
@@ -174,20 +171,18 @@ drawBar mv drawArea = do
   (w, h) <- widgetGetSize drawArea
   drawWin <- widgetGetDrawWindow drawArea
   s <- readMVar mv
-  let info = fromJust $ barInfo s
-  modifyMVar_ mv (\s' -> return s' { barIsBootstrapped = True })
-  renderWithDrawable drawWin (renderBar info (barConfig s) w h)
+  case barInfo s of
+    Nothing -> return () -- TODO: draw something meaningful
+    Just info -> renderWithDrawable drawWin (renderBar info (barConfig s) w h)
 
-batteryBarNew :: Int -> BarConfig -> IO (Widget, BatteryBarHandle)
-batteryBarNew height cfg = do
+batteryWidgetNew :: Int -> BarConfig -> IO (Widget, BatteryBarHandle)
+batteryWidgetNew height cfg = do
   drawArea <- drawingAreaNew
 
-  mv <- newMVar BatteryBarState { barIsBootstrapped = False
-                                 , barInfo = Nothing
-                                 , barCanvas = drawArea
-                                 , barConfig = cfg
-                                 }
-
+  mv <- newMVar BatteryBarState { barInfo = Nothing
+                                , barCanvas = drawArea
+                                , barConfig = cfg
+                                }
 
   let width = (round $ (fromIntegral height) * 30 / 46) + 2 * (barPadding cfg)
 
