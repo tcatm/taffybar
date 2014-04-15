@@ -13,6 +13,7 @@ module System.Taffybar.Battery (
   defaultBatteryConfig
   ) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.STM
 import Control.Concurrent.STM.TVar
@@ -20,6 +21,7 @@ import qualified Control.Exception.Enclosed as E
 import Data.Int ( Int64 )
 import Data.IORef
 import Data.Map
+import Data.Maybe
 import Graphics.UI.Gtk
 import qualified System.IO as IO
 import Text.Printf ( printf )
@@ -105,8 +107,7 @@ defaultBatteryConfig =
   where
     colorFunc pct
       | pct < 0.1 = (1, 0, 0)
-      | pct < 0.9 = (1, 1, 1)
-      | otherwise = (0, 1, 0)
+      | otherwise = (0.3, 0.8, 1)
 
 frontend s battCfg height = UPowerFrontend { upowerAdd = batteryAdd s battCfg height
                                            , upowerRemove = batteryRemove s
@@ -116,38 +117,33 @@ frontend s battCfg height = UPowerFrontend { upowerAdd = batteryAdd s battCfg he
 batteryAdd s battCfg height path object = do
   let widgets = snd s
   a <- readTVarIO widgets
-  when (notMember path a) $ do
-    (bar, handle) <- batteryWidgetNew height battCfg
-    batteryWidgetSet handle object
-    boxPackStart (fst s) bar PackNatural 0
-    let a' = insert path (bar, handle) a
-    atomically . writeTVar widgets $ a'
+  unless (member path a) $
+    when (upowerType object == UPowerTypeBattery) $ do
+      (bar, handle) <- batteryWidgetNew height battCfg
+      batteryWidgetSet handle object
+      boxPackEnd (fst s) bar PackNatural 0
+      let a' = insert path (bar, handle) a
+      atomically . writeTVar widgets $ a'
 
 batteryRemove s path = do
   let widgets = snd s
   a <- readTVarIO widgets
-  let widget = Data.Map.lookup path a
-  case widget of
-    Nothing -> return ()
-    Just (b, _) -> do
-      containerRemove (fst s) b
-      let a' = delete path a
-      atomically . writeTVar widgets $ a'
+  let widget = fst <$> Data.Map.lookup path a
+  when (isJust widget) $ do
+    containerRemove (fst s) (fromJust widget)
+    atomically . writeTVar widgets $ delete path a
 
 batteryUpdate s path object = do
   let widgets = snd s
   a <- readTVarIO widgets
-  let widget = Data.Map.lookup path a
-  case widget of
-    Nothing -> return ()
-    Just (_,b) -> batteryWidgetSet b object
-  
+  let widget = snd <$> Data.Map.lookup path a
+  when (isJust widget) $ batteryWidgetSet (fromJust widget) object
 
 batteryBarNew :: Int -- ^ Height of bar
                  -> BarConfig -- ^ Configuration options for the bar display
                  -> IO Widget
 batteryBarNew height battCfg = do
-  widgets <- newTVarIO (empty :: Map UPowerId (Widget, BatteryBarHandle))
+  widgets <- newTVarIO (Data.Map.empty :: Map UPowerId (Widget, BatteryBarHandle))
   b <- hBoxNew False 1
   upowerWatcher $ frontend (b, widgets) battCfg height
   widgetShowAll b

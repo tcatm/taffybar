@@ -32,7 +32,7 @@ data BarConfig =
             , barColor :: Double -> (Double, Double, Double) -- ^ A function to determine the color of the widget for the current data point
             , barFlashColor :: (Double, Double, Double) -- ^ Color of the charging indicator
             , barAlertColor :: (Double, Double, Double) -- ^ Color of the alert (empty) indicator
-            , barPlugColor :: (Double, Double, Double) -- ^ Color of the plug (fully charged) indicator
+            , barIdleColor :: (Double, Double, Double) -- ^ Color of the idle indicator
             , barPadding :: Int -- ^ Number of pixels of padding around the widget
             }
 
@@ -41,9 +41,9 @@ data BarConfig =
 defaultBarConfig :: (Double -> (Double, Double, Double)) -> BarConfig
 defaultBarConfig c = BarConfig { barBorderColor = (0.4, 0.4, 0.4)
                                , barBackgroundColor = const (0, 0, 0)
-                               , barFlashColor = (0.15, 0.15, 0.15)
+                               , barFlashColor = (1, 1, 1)
                                , barAlertColor = (1, 0, 0)
-                               , barPlugColor = (0.15, 0.15, 0.15)
+                               , barIdleColor = (0.2, 0.5, 0.8)
                                , barColor = c
                                , barPadding = 3
                                }
@@ -79,8 +79,11 @@ renderBackground cfg = do
   renderCell
   fill
 
-renderForeground cfg pct = do
-  let (frameR, frameG, frameB) = barColor cfg pct
+renderForeground cfg pct discharging = do
+  let (frameR, frameG, frameB) = if discharging
+                                  then barColor cfg pct
+                                  else barIdleColor cfg
+
   setSourceRGB frameR frameG frameB
   rectangle 0 (1-pct) 1 1
   save
@@ -102,29 +105,6 @@ renderFlash cfg = do
   lineTo 8 8
   lineTo 5 8
   lineTo 7 4
-  fill
-  restore
-
-renderPlug cfg = do
-  let (frameR, frameG, frameB) = barPlugColor cfg
-  setSourceRGB frameR frameG frameB
-  save
-  scale (1/16) (1/16)
-  moveTo 4 6
-  lineTo 4 8.1875
-  curveTo 2.8416522 8.6030105 2 9.6986791 2 11
-  lineTo 3 11
-  lineTo 3 13
-  lineTo 4 13
-  lineTo 4 11
-  lineTo 6 11
-  lineTo 6 13
-  lineTo 7 13
-  lineTo 7 11
-  lineTo 8 11
-  curveTo 8 9.6986791 7.1583478 8.6030105 6 8.1875
-  lineTo 6 6
-  lineTo 4 6
   fill
   restore
 
@@ -155,16 +135,13 @@ renderBar info cfg width height = do
   scale s s
 
   renderBackground cfg
-  renderForeground cfg pct
+  renderForeground cfg pct (upowerState info == UPowerStateDischarging)
 
   let charging = upowerState info == UPowerStateCharging
   when charging $ renderFlash cfg
 
   let empty = upowerState info == UPowerStateEmpty
   when empty $ renderAlert cfg
-
-  let full = upowerState info == UPowerStateFullyCharged
-  when full $ renderPlug cfg
 
 drawBar :: MVar BatteryBarState -> DrawingArea -> IO ()
 drawBar mv drawArea = do
