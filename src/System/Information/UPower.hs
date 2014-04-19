@@ -17,6 +17,7 @@ module System.Information.UPower (
   ) where
 
 import Control.Applicative
+import Control.Concurrent.MVar
 import Data.Map ( Map )
 import qualified Data.Map as M
 import Data.Maybe
@@ -174,23 +175,38 @@ newtype UPowerId = UPowerId String deriving (Show, Eq, Ord)
 data UPowerFrontend = UPowerFrontend { upowerAdd :: UPowerId -> UPowerInfo -> IO ()
                                      , upowerRemove :: UPowerId -> IO ()
                                      , upowerUpdate :: UPowerId -> UPowerInfo -> IO ()
-                                     }           
+                                     }
 
-deviceAdd :: Client -> UPowerFrontend -> ObjectPath -> IO ()
-deviceAdd client frontend path = do
-  info <- getUPowerInfo $ BC client path
-  upowerAdd frontend (UPowerId . formatObjectPath $ path) info
+deviceAdd :: MVar (Map ObjectPath SignalHandler) -> Client -> UPowerFrontend -> ObjectPath -> IO ()
+deviceAdd handlers client frontend path = do
+  hs <- takeMVar handlers
+  let handler = M.lookup path hs
+  a' <- case handler of
+         Just _ -> return hs
+         Nothing -> do
+           info <- getUPowerInfo $ BC client path
+           upowerAdd frontend (UPowerId . formatObjectPath $ path) info
+           let match = matchAny { matchPath = Just path, matchMember = Just "PropertiesChanged" }
+           h <- addMatch client match $ deviceChange client frontend
 
-deviceRemove :: UPowerFrontend -> ObjectPath -> IO ()
-deviceRemove frontend path = upowerRemove frontend $ UPowerId . formatObjectPath $ path
+           return $ M.insert path h hs
 
-deviceChange :: Client -> UPowerFrontend -> ObjectPath -> IO ()
-deviceChange client frontend path = do
+  putMVar handlers a'
+
+deviceRemove :: MVar (Map ObjectPath SignalHandler) -> UPowerFrontend -> ObjectPath -> IO ()
+deviceRemove handlers frontend path = do
+  upowerRemove frontend $ UPowerId . formatObjectPath $ path
+  hs <- takeMVar handlers
+  putMVar handlers $ M.delete path hs
+
+deviceChange :: Client -> UPowerFrontend -> Signal -> IO ()
+deviceChange client frontend signal = do
+  let path = signalPath signal
   info <- getUPowerInfo $ BC client path
   upowerUpdate frontend (UPowerId . formatObjectPath $ path) info
 
 pathFromSignal :: Signal -> ObjectPath
-pathFromSignal = objectPath_ . fromJust . fromVariant . head . signalBody
+pathFromSignal = fromJust . fromVariant . head . signalBody
 
 upowerWatcher :: UPowerFrontend -> IO ()
 upowerWatcher frontend = do
@@ -199,19 +215,18 @@ upowerWatcher frontend = do
         { methodCallDestination = Just powerBusName
         }
 
+  handlers <- newMVar (M.empty :: Map ObjectPath SignalHandler)
+
   let devices :: [ObjectPath]
       devices = fromJust . fromVariant . head . methodReturnBody $ reply
 
-  mapM (deviceAdd systemConn frontend) devices
+  mapM (deviceAdd handlers systemConn frontend) devices
 
   let matchDeviceAdded = matchAny { matchPath = Just powerBaseObjectPath, matchMember = Just "DeviceAdded" }
   let matchDeviceRemoved = matchAny { matchPath = Just powerBaseObjectPath, matchMember = Just "DeviceRemoved" }
-  let matchDeviceChanged = matchAny { matchPath = Just powerBaseObjectPath, matchMember = Just "DeviceChanged" }
+  let matchDeviceChanged = matchAny { matchPath = Just powerBaseObjectPath, matchMember = Just "PropertiesChanged" }
 
-  addMatch systemConn matchDeviceAdded $ deviceAdd systemConn frontend . pathFromSignal
-  addMatch systemConn matchDeviceRemoved $ deviceRemove frontend . pathFromSignal
-  addMatch systemConn matchDeviceChanged $ deviceChange systemConn frontend . pathFromSignal
+  addMatch systemConn matchDeviceAdded $ deviceAdd handlers systemConn frontend . pathFromSignal
+  addMatch systemConn matchDeviceRemoved $ deviceRemove handlers frontend . pathFromSignal
 
   return ()
-
--- Handle things like Mouseupower?
