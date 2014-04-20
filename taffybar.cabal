@@ -111,7 +111,8 @@ executable taffybar
                  gtk >= 0.12 && < 0.14,
                  safe >= 0.3 && < 1,
                  xdg-basedir,
-                 filepath
+                 filepath,
+                 X11 >= 1.5.0.1
   hs-source-dirs: src
   main-is: Main.hs
   pkgconfig-depends: gtk+-2.0
