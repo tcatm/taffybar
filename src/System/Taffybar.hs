@@ -132,6 +132,7 @@ import Data.Maybe ( fromMaybe )
 import System.Environment.XDG.BaseDir ( getUserConfigFile )
 import System.FilePath ( (</>) )
 import Graphics.UI.Gtk
+import Graphics.X11.Xlib.Misc
 import Safe ( atMay )
 import System.Exit ( exitFailure )
 import qualified System.IO as IO
@@ -270,6 +271,8 @@ taffybarMain cfg = do
   rcSetDefaultFiles [ defaultGtkConfig, userGtkConfig ]
 
   _ <- initGUI
+
+  setDefaultErrorHandler
 
   Just disp <- displayGetDefault
   nscreens <- displayGetNScreens disp
