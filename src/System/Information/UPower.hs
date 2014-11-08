@@ -26,8 +26,6 @@ import Data.Int
 import DBus
 import DBus.Client
 import Data.List ( find, isInfixOf )
-import Data.Text ( Text )
-import qualified Data.Text as T
 
 -- | An opaque wrapper around some internal library state
 data UPowerContext = BC Client ObjectPath
@@ -63,35 +61,35 @@ data UPowerTechnology = UPowerTechnologyUnknown
 
 -- | There are a few fields supported by UPower that aren't exposed
 -- here.. could be easily.
-data UPowerInfo = UPowerInfo { upowerNativePath :: Text
-                               , upowerVendor :: Text
-                               , upowerModel :: Text
-                               , upowerSerial :: Text
-                               -- , upowerUpdateTime :: Time
-                               , upowerType :: UPowerType
-                               , upowerPowerSupply :: Bool
-                               , upowerHasHistory :: Bool
-                               , upowerHasStatistics :: Bool
-                               , upowerOnline :: Bool
-                               , upowerEnergy :: Double
-                               , upowerEnergyEmpty :: Double
-                               , upowerEnergyFull :: Double
-                               , upowerEnergyFullDesign :: Double
-                               , upowerEnergyRate :: Double
-                               , upowerVoltage :: Double
-                               , upowerTimeToEmpty :: Int64
-                               , upowerTimeToFull :: Int64
-                               , upowerPercentage :: Double
-                               , upowerIsPresent :: Bool
-                               , upowerState :: UPowerState
-                               , upowerIsRechargable :: Bool
-                               , upowerCapacity :: Double
-                               , upowerTechnology :: UPowerTechnology
-{-                               , upowerRecallNotice :: Bool
-                               , upowerRecallVendor :: Text
-                               , upowerRecallUr :: Text
+data UPowerInfo = UPowerInfo { upowerNativePath :: String
+                             , upowerVendor :: String
+                             , upowerModel :: String
+                             , upowerSerial :: String
+                             -- , upowerUpdateTime :: Time
+                             , upowerType :: UPowerType
+                             , upowerPowerSupply :: Bool
+                             , upowerHasHistory :: Bool
+                             , upowerHasStatistics :: Bool
+                             , upowerOnline :: Bool
+                             , upowerEnergy :: Double
+                             , upowerEnergyEmpty :: Double
+                             , upowerEnergyFull :: Double
+                             , upowerEnergyFullDesign :: Double
+                             , upowerEnergyRate :: Double
+                             , upowerVoltage :: Double
+                             , upowerTimeToEmpty :: Int64
+                             , upowerTimeToFull :: Int64
+                             , upowerPercentage :: Double
+                             , upowerIsPresent :: Bool
+                             , upowerState :: UPowerState
+                             , upowerIsRechargable :: Bool
+                             , upowerCapacity :: Double
+                             , upowerTechnology :: UPowerTechnology
+{-                             , upowerRecallNotice :: Bool
+                             , upowerRecallVendor :: String
+                             , upowerRecallUr :: String
 -}
-                               } deriving (Show)
+                             } deriving (Show)
 
 -- | Find the first power source that is a upower in the list.  The
 -- simple heuristic is a substring search on 'BAT'
@@ -108,14 +106,14 @@ powerBaseObjectPath = "/org/freedesktop/UPower"
 
 -- | A helper to read the variant contents of a dict with a default
 -- value.
-readDict :: (IsVariant a) => Map Text Variant -> Text -> a -> a
+readDict :: (IsVariant a) => Map String Variant -> String -> a -> a
 readDict dict key dflt = val
   where
     Just val = fromVariant variant
     variant = M.findWithDefault (toVariant dflt) key dict
 
 -- | Read the variant contents of a dict which is of an unknown integral type.
-readDictIntegral :: Map Text Variant -> Text -> Int32 -> Int
+readDictIntegral :: Map String Variant -> String -> Int32 -> Int
 readDictIntegral dict key dflt = case variantType variant of
     TypeWord8   -> fromIntegral (f variant :: Word8)
     TypeWord16  -> fromIntegral (f variant :: Word16)
@@ -139,10 +137,10 @@ getUPowerInfo (BC systemConn battPath) = do
   -- message.
   reply <- call_ systemConn (methodCall battPath "org.freedesktop.DBus.Properties" "GetAll")
                              { methodCallDestination = Just "org.freedesktop.UPower"
-                             , methodCallBody = [toVariant $ T.pack "org.freedesktop.UPower.Device"]
+                             , methodCallBody = [toVariant ("org.freedesktop.UPower.Device" :: String)]
                              }
 
-  let dict :: Map Text Variant
+  let dict :: Map String Variant
       Just dict = fromVariant (methodReturnBody reply !! 0)
   return UPowerInfo { upowerNativePath = readDict dict "NativePath" ""
                      , upowerVendor = readDict dict "Vendor" ""

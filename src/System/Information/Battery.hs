@@ -17,7 +17,7 @@ module System.Information.Battery (
 import Control.Applicative
 import Data.Map ( Map )
 import qualified Data.Map as M
-import Data.Maybe ( fromMaybe )
+import Data.Maybe ( fromMaybe, fromJust )
 import Data.Word
 import Data.Int
 import DBus
