@@ -25,18 +25,16 @@ import Data.Map ( Map )
 import Data.Monoid ( mconcat )
 import qualified Data.Sequence as S
 import Data.Sequence ( Seq, (|>), viewl, ViewL(..) )
-import Data.Text ( Text )
-import qualified Data.Text as T
 import Data.Word ( Word32 )
 import DBus
 import DBus.Client
 import Graphics.UI.Gtk hiding ( Variant )
 
 -- | A simple structure representing a Freedesktop notification
-data Notification = Notification { noteAppName :: Text
+data Notification = Notification { noteAppName :: String
                                  , noteReplaceId :: Word32
-                                 , noteSummary :: Text
-                                 , noteBody :: Text
+                                 , noteSummary :: String
+                                 , noteBody :: String
                                  , noteExpireTimeout :: Int32
                                  , noteId :: Word32
                                  }
@@ -71,14 +69,14 @@ initialNoteState wrapper l cfg = do
                      , noteChan = ch
                      }
 
-getServerInformation :: IO (Text, Text, Text, Text)
+getServerInformation :: IO (String, String, String, String)
 getServerInformation =
   return ("haskell-notification-daemon",
           "nochair.net",
           "0.0.1",
           "1.1")
 
-getCapabilities :: IO [Text]
+getCapabilities :: IO [String]
 getCapabilities = return ["body", "body-markup"]
 
 nextNotification :: NotifyState -> STM ()
@@ -136,13 +134,13 @@ formatMessage s = take maxlen . fmt
 -- notification (if there is another in the queue).  If it found a new
 -- notification, that node is then displayed.
 notify :: NotifyState
-          -> Text -- ^ Application name
+          -> String -- ^ Application name
           -> Word32 -- ^ Replaces id
-          -> Text -- ^ App icon
-          -> Text -- ^ Summary
-          -> Text -- ^ Body
-          -> [Text] -- ^ Actions
-          -> Map Text Variant -- ^ Hints
+          -> String -- ^ App icon
+          -> String -- ^ Summary
+          -> String -- ^ Body
+          -> [String] -- ^ Actions
+          -> Map String Variant -- ^ Hints
           -> Int32 -- ^ Expires timeout (milliseconds)
           -> IO Word32
 notify istate appName replaceId _ summary body _ _ timeout = do
@@ -186,7 +184,7 @@ notify istate appName replaceId _ summary body _ _ timeout = do
   where
     replaceNote newNote = fmap (\n -> if noteId n == noteReplaceId newNote then newNote else n)
     idsrc = noteIdSource istate
-    escapeText = T.pack . escapeMarkup . T.unpack
+    escapeText = escapeMarkup
     maxtout = fromIntegral $ notificationMaxTimeout (noteConfig istate)
     tout = case timeout of
       0 -> maxtout
@@ -249,10 +247,10 @@ data NotificationConfig =
 defaultFormatter :: Notification -> String
 defaultFormatter note = msg
   where
-    msg = case T.null (noteBody note) of
-      True -> T.unpack $ noteSummary note
-      False -> T.unpack $ mconcat [ "<span fgcolor='yellow'>Note:</span>"
-                                  , noteSummary note, ": ", noteBody note ]
+    msg = case null (noteBody note) of
+      True -> noteSummary note
+      False -> mconcat [ "<span fgcolor='yellow'>Note:</span>"
+                       , noteSummary note, ": ", noteBody note ]
 
 -- | The default formatter is one of
 --

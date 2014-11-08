@@ -22,8 +22,6 @@ import Data.Int
 import DBus
 import DBus.Client
 import Data.List ( find, isInfixOf )
-import Data.Text ( Text )
-import qualified Data.Text as T
 import Safe ( atMay )
 
 -- | An opaque wrapper around some internal library state
@@ -60,10 +58,10 @@ data BatteryTechnology = BatteryTechnologyUnknown
 
 -- | There are a few fields supported by UPower that aren't exposed
 -- here.. could be easily.
-data BatteryInfo = BatteryInfo { batteryNativePath :: Text
-                               , batteryVendor :: Text
-                               , batteryModel :: Text
-                               , batterySerial :: Text
+data BatteryInfo = BatteryInfo { batteryNativePath :: String
+                               , batteryVendor :: String
+                               , batteryModel :: String
+                               , batterySerial :: String
                                -- , batteryUpdateTime :: Time
                                , batteryType :: BatteryType
                                , batteryPowerSupply :: Bool
@@ -85,8 +83,8 @@ data BatteryInfo = BatteryInfo { batteryNativePath :: Text
                                , batteryCapacity :: Double
                                , batteryTechnology :: BatteryTechnology
 {-                               , batteryRecallNotice :: Bool
-                               , batteryRecallVendor :: Text
-                               , batteryRecallUr :: Text
+                               , batteryRecallVendor :: String
+                               , batteryRecallUr :: String
 -}
                                }
 
@@ -105,13 +103,13 @@ powerBaseObjectPath = "/org/freedesktop/UPower"
 
 -- | A helper to read the variant contents of a dict with a default
 -- value.
-readDict :: (IsVariant a) => Map Text Variant -> Text -> a -> a
+readDict :: (IsVariant a) => Map String Variant -> String -> a -> a
 readDict dict key dflt = fromMaybe dflt $ do
   variant <- M.lookup key dict
   fromVariant variant
 
 -- | Read the variant contents of a dict which is of an unknown integral type.
-readDictIntegral :: Map Text Variant -> Text -> Int32 -> Int
+readDictIntegral :: Map String Variant -> String -> Int32 -> Int
 readDictIntegral dict key dflt = fromMaybe (fromIntegral dflt) $ do
   v <- M.lookup key dict
   case variantType v of
@@ -136,7 +134,7 @@ getBatteryInfo (BC systemConn battPath) = do
   -- message.
   reply <- call_ systemConn (methodCall battPath "org.freedesktop.DBus.Properties" "GetAll")
                              { methodCallDestination = Just "org.freedesktop.UPower"
-                             , methodCallBody = [toVariant $ T.pack "org.freedesktop.UPower.Device"]
+                             , methodCallBody = [toVariant ("org.freedesktop.UPower.Device" :: String)]
                              }
 
   return $ do

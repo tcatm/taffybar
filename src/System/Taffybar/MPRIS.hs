@@ -12,8 +12,6 @@ module System.Taffybar.MPRIS ( mprisNew ) where
 
 import Data.Int ( Int32 )
 import qualified Data.Map as M
-import Data.Text ( Text )
-import qualified Data.Text as T
 import DBus
 import DBus.Client
 import Graphics.UI.Gtk hiding ( Signal, Variant )
@@ -45,15 +43,17 @@ variantDictLookup k m = do
 
 trackCallback :: Label -> Signal -> IO ()
 trackCallback w s = do
-  let v :: Maybe (M.Map Text Variant)
+  let v :: Maybe (M.Map String Variant)
       v = fromVariant variant
       [variant] = signalBody s
   case v of
     Just m -> do
-      let artist = maybe "[unknown]" id (variantDictLookup "artist" m)
+      let artist :: String
+          artist = maybe "[unknown]" id (variantDictLookup "artist" m)
+          track :: String
           track = maybe "[unknown]" id (variantDictLookup "title" m)
           msg :: String
-          msg = escapeMarkup $ printf "%s - %s" (T.unpack artist) (T.unpack track)
+          msg = escapeMarkup $ printf "%s - %s" artist track
           txt = "<span fgcolor='yellow'>Now Playing:</span> " ++ msg
       postGUIAsync $ do
         -- In case the widget was hidden due to a stop/pause, forcibly
